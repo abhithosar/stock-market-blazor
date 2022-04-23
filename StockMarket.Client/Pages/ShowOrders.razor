@@ -1,0 +1,166 @@
+﻿@page "/orders"
+@using StockMarket.Shared.Data.Context
+
+@inject OrdersApi orderApi
+
+<h6>List of Orders</h6>
+<p></p>
+<style>
+    .selected {
+        background-color: #1E88E5 !important;
+    }
+
+        .selected > td {
+            color: white !important;
+        }
+
+            .selected > td .mud-input {
+                color: white !important;
+            }
+</style>
+
+<MudTable Items="@Orders" OnRowClick="RowClick" RowClassFunc="SelectedRowClassFunc" T="Order" @ref="mudTable" @bind-SelectedItem="SelectedItem" Hover="@hover">
+    <HeaderContent>
+        <MudTh>Order Id</MudTh>
+        <MudTh>Stock Ticker</MudTh>
+        <MudTh>Order Total</MudTh>
+        <MudTh>Purchase Price</MudTh>
+        <MudTh>Order date</MudTh>
+        <MudTh>Share Volume</MudTh>
+        <MudTh>Order Type</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Order Id">@context.Id</MudTd>
+        <MudTd DataLabel="Stock Ticker">@context.StockTicker</MudTd>
+        <MudTd DataLabel="Order Total">@context.OrderTotal</MudTd>
+        <MudTd DataLabel="Purchase Price">@context.OrderedPrice</MudTd>
+        <MudTd DataLabel="Order date">@context.OrderDate</MudTd>
+        <MudTd DataLabel="Share Volume">@context.Volume</MudTd>
+        <MudTd DataLabel="Order Type">@(context.OrderCode == "NOR"?"Normal":"Limit")</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[]{50, 100}" />
+    </PagerContent>
+</MudTable>
+
+
+<MudButton OnClick="DeleteOrder" Class="align-content-end m-4" Variant="Variant.Filled" Color="Color.Primary">
+    Cancel Order
+</MudButton>
+
+<MudDialog @bind-IsVisible="OrderStatusDialog" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" /> Order Status
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+
+        @{
+            <p>Do you want to cancel this order?</p>
+        }
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CancelConfirm" Class="px-10">Confirm</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-IsVisible="OrderDeleted" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" /> Order Status
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+
+        @{
+            <p>Order Canceled!</p>
+        }
+
+    </DialogContent>
+    <DialogActions>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private DialogOptions dialogOptions = new() { FullWidth = true };
+
+    private int selectedRowNumber = -1;
+
+    private MudTable<Order> mudTable;
+
+    private List<Order>? Orders;
+    private HashSet<Order>? SelectedItems;
+    private Order? SelectedItem;
+    private bool hover = true;
+    private bool OrderDeleted;
+    private bool OrderStatusDialog;
+
+    protected async override Task OnInitializedAsync()
+    {
+        Orders = await orderApi.GetListOfOrders();
+        Orders = Orders.OrderByDescending(x => x.UpdatedOn).ToList();
+        await base.OnInitializedAsync();
+        return;
+    }
+
+    private void RowClick(TableRowClickEventArgs<Order> tableRowClickEventArgs)
+    {
+
+    }
+    private void DeleteOrder()
+    {
+        if (Orders == null)
+            return;
+        if (Orders.Count() == 0)
+            return;
+        OrderStatusDialog = true;
+    }
+    private async void CancelConfirm()
+    {
+        OrderStatusDialog = false;
+        if (SelectedItem != null)
+        {
+            var res = await orderApi.CancelOrder(SelectedItem.Id);
+            if (res)
+            {
+                OrderDeleted = true;
+                Orders = await orderApi.GetListOfOrders();
+                StateHasChanged();
+            }
+        }
+    }
+
+
+    private string SelectedRowClassFunc(Order element, int rowNumber)
+    {
+        if (element.OrderCode == "NOR")
+            return string.Empty;
+        if (selectedRowNumber == rowNumber)
+        {
+            selectedRowNumber = -1;
+            return string.Empty;
+        }
+        else if (mudTable.SelectedItem != null && mudTable.SelectedItem.Id == element.Id)
+        {
+            selectedRowNumber = rowNumber;
+
+            return "selected";
+        }
+        else
+        {
+            return string.Empty;
+        }
+    }
+
+    private void Close()
+    {
+        OrderStatusDialog = false;
+        OrderDeleted = false;
+    }
+
+}

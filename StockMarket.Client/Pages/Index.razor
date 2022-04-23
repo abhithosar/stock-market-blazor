@@ -1,0 +1,25 @@
+﻿@page "/"
+@attribute [Authorize]
+@layout MainLayout
+<PageTitle>Index</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        
+        @if (context.User.IsInRole("user"))
+        {
+            <h6>Hello @context.User.Identity.Name, your market portfolio</h6>
+            <Portfolios />
+        }
+
+        else
+        {
+             <h6>Hello @context.User.Identity.Name, current market</h6>
+            <AllStocks/>
+        }
+    </Authorized>
+    <Authorizing>
+        <h1>Loading ...</h1>
+    </Authorizing>
+</AuthorizeView>
+

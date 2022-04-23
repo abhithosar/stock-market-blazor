@@ -1,0 +1,59 @@
+﻿@*@page "/portfolio"*@
+@using StockMarket.Shared.Data.Context
+@using Microsoft.AspNetCore.SignalR.Client
+
+<p></p>
+@inject NavigationManager NavigationManager
+@inject StockApi stockApi
+
+<MudTable Items="@PortfolioList" T="Portfolio" Hover="@hover">
+    <HeaderContent>
+        <MudTh>Stock</MudTh>
+        <MudTh>Stock Amount</MudTh>
+        <MudTh>Portfolio Value</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Stock">@context.StockTicker</MudTd>
+        <MudTd DataLabel="Stock Amount">@context.StockAmount</MudTd>
+        <MudTd DataLabel="Portfolio Value">@context.PortfolioValue</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[]{50, 100}" />
+    </PagerContent>
+</MudTable>
+
+
+@code {
+    private List<Portfolio>? PortfolioList;
+    private bool hover;
+
+
+    private HubConnection? hubConnection;
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        PortfolioList = await stockApi.GetPortfolio();
+
+        hubConnection = new HubConnectionBuilder()
+           .WithUrl(NavigationManager.ToAbsoluteUri("/portfoliohub"))
+           .Build();
+
+        hubConnection.On<StockMarket.Shared.Data.Models.RunningDayStockLedger>("StockPriceUpdate", (ledger) =>
+         {
+
+             var portf = PortfolioList.FirstOrDefault(x => x.StockId == ledger.StockId);
+             if (portf != null)
+             {
+                 portf.PortfolioValue = portf.StockAmount * ledger.CurrentPrice;
+
+             }
+
+             StateHasChanged();
+         });
+          await hubConnection.StartAsync();
+         await  base.OnInitializedAsync();
+        return;
+    }
+
+}

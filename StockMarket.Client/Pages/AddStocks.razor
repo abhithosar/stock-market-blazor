@@ -1,0 +1,147 @@
+﻿@page "/addstock"
+@using System.ComponentModel.DataAnnotations
+@using StockMarket.Shared.Data.Models
+@inject StockApi _stockApi
+
+@inject IDialogService DialogService
+<h6>Add Stocks</h6>
+<p></p>
+<EditForm Model="@addStockForm" OnInvalidSubmit="OnInvalidSubmit" OnValidSubmit="OnValidSubmit">
+    <DataAnnotationsValidator />
+    <MudGrid>
+        <MudItem xs="12" sm="7">
+            <MudCard>
+                <MudCardContent>
+
+                    <MudTextField Label="Stock Ticker" HelperText="Max. 8 characters"
+                                  @bind-Value="addStockForm.StockTicker" For="@(() => addStockForm.StockTicker)" />
+
+                    <MudTextField Label="Company Name" Class="mt-3"
+                                  @bind-Value="addStockForm.CompanyName" For="@(() => addStockForm.CompanyName)" />
+
+                    <MudNumericField Class="mt-3" @bind-Value="addStockForm.StockInitialPrice" For="@(() => addStockForm.StockInitialPrice)"
+                                     Label="Stock Initial Price" Variant="Variant.Text" Step=".01M" />
+
+                    <MudTextField Label="Stock Initial Volume" HelperText="Total share available for trading" Class="mt-3"
+                                  @bind-Value="addStockForm.StockInitialVolume" For="@(() => addStockForm.StockInitialVolume)" InputType="InputType.Number" />
+                </MudCardContent>
+                @if (!IsValid)
+                {
+                    <MudText Color="@Color.Error">
+                        <ValidationSummary />
+                    </MudText>
+                }
+                <MudCardActions>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Add Stock</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</EditForm>
+<MudDialog  @ref="addStockDialog" >
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" /> Create Stock Result
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (IsSuccess)
+        {
+            <p>Stock created for @CompanyName .</p>
+        }
+        else
+        {
+            <p>Stock creation failed for <b>@CompanyName</b>.</p>
+            <p>please try again.</p>
+        }
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton  ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseDialog" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    private DialogOptions dialogOptions = new() { FullWidth = true,CloseButton=true,CloseOnEscapeKey=true };
+    private MudDialog addStockDialog;
+    private bool IsDialogVisibleAddStock;
+    private bool IsSuccess;
+    private string CompanyName;
+    AddStockForm addStockForm = new AddStockForm();
+    private bool IsValid;
+    public class AddStockForm
+    {
+        [Required]
+        [StringLength(8, MinimumLength = 3, ErrorMessage = "Name length can't be more than 8.")]
+        [Display(Name = "Stock ticker")]
+        public string? StockTicker { get; set; }
+
+        [Required]
+        [Display(Name = "Company name")]
+        public string? CompanyName { get; set; }
+
+        [Required]
+        [Display(Name = "Stock initial price")]
+        [Range(1, 999999999)]
+        public decimal StockInitialPrice { get; set; }
+
+        [Required]
+        [Range(1, 99999999)]
+        [Display(Name = "Stock initial volume")]
+        public int StockInitialVolume { get; set; }
+
+
+    }
+
+    protected override Task OnInitializedAsync()
+    {
+        addStockDialog = new MudDialog();
+        addStockDialog.Options = dialogOptions;
+        return base.OnInitializedAsync();
+    }
+
+    private void CloseDialog()
+    {
+        //addStockDialog.Close();
+        StateHasChanged();
+    }
+    private void OnInvalidSubmit(EditContext context)
+    {
+        IsValid = false;
+        StateHasChanged();
+
+    }
+    private void OnValidSubmit(EditContext context)
+    {
+        IsValid = true;
+        AddStock();
+        StateHasChanged();
+    }
+
+    private async void AddStock()
+    {
+        var stock = new Stock()
+            {
+                CompanyName = addStockForm.CompanyName,
+                TickerName = addStockForm.StockTicker,
+                InitialPrice = addStockForm.StockInitialPrice,
+                InitialStockVolume = addStockForm.StockInitialVolume
+            };
+
+        IsSuccess = await _stockApi.CreateStock(stock);
+
+        CompanyName = addStockForm.CompanyName;
+        if (IsSuccess)
+        {
+            addStockForm = new AddStockForm();
+            var parameters = new DialogParameters();
+                     parameters.Add("ContentText", "Stock added Successfully.");
+                     parameters.Add("ButtonText", "Ok");
+                     parameters.Add("Color", Color.Success);
+
+                 var options = new DialogOptions() { CloseButton = false, MaxWidth = MaxWidth.ExtraLarge };
+                  DialogService.Show<DialogTemplate>("Result", parameters, options);
+        }
+        StateHasChanged();
+    }
+   
+}

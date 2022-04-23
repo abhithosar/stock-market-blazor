@@ -1,0 +1,256 @@
+﻿@page "/sellstocks"
+
+@using StockMarket.Shared.Data.Context
+@using StockMarket.Shared.Data.Models
+
+@inject StockApi stockApi
+@inject MarketHourApi marketHourApi
+
+@inject IDialogService DialogService
+<h6>Sell Stocks</h6>
+<p></p>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="4">
+        <MudAutocomplete T="Portfolio" Label="Search by company of scrip" @bind-Value="@Stock" SearchFunc="@SearchStock"
+            ResetValueOnEmptyText="@resetValueOnEmptyText" CoerceText="@coerceText" CoerceValue="@coerceValue"
+            ToStringFunc="@GetString" OnBlur="UpdateStock" AdornmentIcon="@Icons.Material.Filled.Search"
+            AdornmentColor="Color.Primary" />
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudField Label="Company Name" Variant="Variant.Outlined">@Stock?.CompanyName </MudField>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudField Label="Available Shares" Variant="Variant.Outlined">@Stock?.StockAmount </MudField>
+    </MudItem>
+</MudGrid>
+<MudGrid>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudNumericField @bind-Value="StockPriceToSell" Label="Order Price" Variant="Variant.Text" />
+        @*<MudTextField @bind-Value="StockPriceToPurchase" Placeholder="Enter '0' for market price" Label="Order Price"
+            Variant="Variant.Outlined"></MudTextField>*@
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudDatePicker Label="Order Date" @bind-Date="OrderDate" MinDate="MinDate" Variant="Variant.Outlined" />
+    </MudItem>
+</MudGrid>
+<MudGrid>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudField Label="Current price" Variant="Variant.Outlined">@Stock?.CurrentPrice </MudField>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudNumericField @bind-Value="StockAmountToSell" onchange="@VerifyStockAmount" Min=1
+            Max="MaximumNumberOfStocksToSell" Label="Number of stocks to sell" Variant="Variant.Outlined">
+        </MudNumericField>
+    </MudItem>
+
+</MudGrid>
+
+<MudGrid>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ShoppingCart" Size="Size.Medium"
+            Color="Color.Warning" OnClick="@SellStocksConfirm">Sell</MudButton>
+    </MudItem>
+
+</MudGrid>
+<MudDialog @ref="mudDialogSell" Options="dialogOptions">
+    <TitleContent>
+        @if (HasError)
+        {
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" />Not Enough stocks
+            </MudText>
+        }
+        else
+        {
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" /> Confirm Purchase
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        @if (!HasError)
+        {
+            <p>Are you sure to buy @StockAmountToSell stocks of '@Stock?.CompanyName'?</p>
+            <p>Total Cost : $
+                <nbsp /> @(StockAmountToSell * Stock.CurrentPrice)
+            </p>
+        }
+        else
+        {
+            <p>Not enough @StockAmountToSell stocks of '@Stock?.CompanyName'?</p>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="StockSellConfirmed" Class="px-10">Sell
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseDialog" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    private DialogOptions dialogOptions = new() { FullWidth = true };
+    private List<Portfolio>? Stocks;
+
+    private MudDialog mudDialogSell;
+
+    private int StockAmountToSell;
+    private decimal StockPriceToSell;
+    private bool resetValueOnEmptyText;
+    private bool coerceText;
+    private bool coerceValue;
+    private bool HasError;
+
+    private bool OrderError;
+    private bool IsDialogVisible;
+    private DateTime? OrderDate { get; set; }
+    private DateTime MinDate { get { return DateTime.Today; } }
+    private int MaximumNumberOfStocksToSell;
+    private bool MarketIsClosed;
+    private bool OrderStatusDialog;
+
+    private Portfolio? stock;
+    private Portfolio? Stock
+    {
+        get
+        {
+
+            return stock;
+        }
+        set
+        {
+
+            if (stock != null && stock.Id != (value as Portfolio).Id)
+            {
+                StockAmountToSell = 0;
+            }
+            stock = value;
+
+        }
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        OrderDate = DateTime.Now;
+        Stocks = await stockApi.GetPortfolio();
+        await base.OnInitializedAsync();
+        return;
+    }
+    private void VerifyStockAmount()
+    {
+        if (StockAmountToSell > Convert.ToInt32((stock.StockAmount * stock.CurrentPrice) / stock.CurrentPrice))
+            StockAmountToSell = Convert.ToInt32((stock.StockAmount * stock.CurrentPrice) / stock.CurrentPrice);
+    }
+    private async void UpdateStock()
+    {
+        try
+        {
+            if (stock != null)
+            {
+                var ledgerEntry = await stockApi.GetStock(stock.StockId.ToString());
+                stock.CurrentPrice = ledgerEntry == null ? -1 : ledgerEntry.CurrentPrice;
+                MaximumNumberOfStocksToSell = Convert.ToInt32((stock.StockAmount * stock.CurrentPrice) / stock.CurrentPrice);
+            }
+
+            StateHasChanged();
+        }
+
+        catch (Exception c)
+        {
+
+        }
+    }
+
+    private void SellStocksConfirm()
+    {
+        if (stock == null)
+            return;
+
+        HasError = stock.StockAmount * stock.CurrentPrice < StockAmountToSell * stock.CurrentPrice;
+
+        mudDialogSell?.Show();
+    }
+    private async void StockSellConfirmed()
+    {
+        //IsDialogVisible = false;
+        mudDialogSell?.Close();
+
+        if (!await marketHourApi.IsMarketOpen())
+        {
+            var parms = new DialogParameters();
+            parms.Add("ContentText", "Market is closed.");
+            parms.Add("ButtonText", "Ok");
+            parms.Add("Color", Color.Success);
+
+            var opts = new DialogOptions() { CloseButton = false, MaxWidth = MaxWidth.ExtraLarge };
+
+            DialogService.Show<DialogTemplate>("Result", parms, opts);
+
+            return;
+        }
+
+
+
+        var sellStockModel = new SellStock()
+        {
+            Id = Stock != null ? Stock.Id : 0,
+            SellAmount = StockAmountToSell,
+            OrderedPrice = StockPriceToSell,
+            ExpiryDate = OrderDate.Value
+        };
+
+        OrderError = !await stockApi.SellStock(sellStockModel);
+
+        var res = !OrderError;
+
+        var msg = res ? "Order placed successfully!" : "Error in placing order, please try again.";
+        var color = res ? Color.Success : Color.Warning;
+
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", msg);
+        parameters.Add("ButtonText", "Ok");
+        parameters.Add("Color", color);
+
+        var options = new DialogOptions() { CloseButton = false, MaxWidth = MaxWidth.ExtraLarge };
+        DialogService.Show<DialogTemplate>("Result", parameters, options);
+
+        // StateHasChanged();
+    }
+    private void CloseDialog()
+    {
+        mudDialogSell?.Close();
+       // StateHasChanged();
+    }
+    private string GetString(Portfolio st)
+    {
+        return st == null ? string.Empty : st.StockTicker;
+    }
+
+    private async Task<IEnumerable<Portfolio>> SearchStock(string value)
+    {
+        var stcks = new List<Portfolio>();
+        if (string.IsNullOrEmpty(value))
+            return stcks;
+
+
+        try
+        {
+
+            stcks = Stocks.Where(x => x.StockTicker.ToLower().Contains(value.ToLower())
+            || x.CompanyName.ToLower().Contains(value.ToLower())).ToList();
+
+
+            // StateHasChanged();
+        }
+        catch (Exception e)
+        {
+            int i = 0;
+        }
+        return stcks;
+    }
+}

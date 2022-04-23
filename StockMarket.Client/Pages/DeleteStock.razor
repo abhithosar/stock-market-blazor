@@ -1,0 +1,177 @@
+﻿@page "/deletestock"
+@using StockMarket.Shared.Data.Models
+<h6>Delete Stock</h6>
+<p></p>
+@inject StockApi _stockApi
+@inject IDialogService DialogService
+<style>
+    .selected {
+        background-color: #1E88E5 !important;
+    }
+
+        .selected > td {
+            color: white !important;
+        }
+
+            .selected > td .mud-input {
+                color: white !important;
+            }
+</style>
+
+
+<MudTable Items="@Stocks" RowClassFunc="SelectedRowClassFunc" T="Stock" @ref="mudTable" @bind-SelectedItem="SelectedItem" Hover="@hover">
+    <HeaderContent>
+        <MudTh>Stock Id</MudTh>
+        <MudTh>Stock Ticker</MudTh>
+        <MudTh>Company Name</MudTh>
+        <MudTh>Current Price</MudTh>
+        <MudTh>Added Date</MudTh>
+
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Stock Id">@context.Id</MudTd>
+        <MudTd DataLabel="Stock Ticker">@context.TickerName</MudTd>
+        <MudTd DataLabel="Company Name">@context.CompanyName</MudTd>
+        <MudTd DataLabel="Current Price">@context.CurrentPrice</MudTd>
+        <MudTd DataLabel="Added Date">@context.CreatedOn</MudTd>
+
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[]{50, 100}" />
+    </PagerContent>
+</MudTable>
+
+
+<MudButton OnClick="DeleteStockConfirm" Class="align-content-end m-4" Variant="Variant.Filled" Color="Color.Primary">
+    Remove Stock
+</MudButton>
+
+
+<MudDialog @ref="delete_dialog" Options="dialogOptions3">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" /> Order Status
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+
+        @{
+            <p>Do you want to remove this stock?</p>
+        }
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CancelConfirm_Delete" Class="px-10">Confirm</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseDeleteDialog" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @ref="delete_dialog1" Options="dialogOptions4">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" /> Stock deletion status
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+
+        @{
+            <p>Stock deleted!</p>
+        }
+
+    </DialogContent>
+    <DialogActions>
+
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" OnClick="Close2" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    private DialogOptions dialogOptions3 = new() { FullWidth = true };
+    private DialogOptions dialogOptions4 = new() { FullWidth = true };
+    private MudDialog delete_dialog;
+    private MudDialog delete_dialog1;
+
+    private int selectedRowNumber = -1;
+
+    private MudTable<Stock> mudTable;
+
+    private List<Stock>? Stocks;
+    private Stock? SelectedItem;
+    private bool hover = true;
+
+    private bool StockDeleted;
+    private void DeleteStockConfirm()
+    {
+        if (selectedRowNumber != -1)
+            delete_dialog?.Show();
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        //delete_dialog = new MudDialog();
+        //delete_dialog1 = new MudDialog();
+        Stocks = await _stockApi.GetAllStocks();
+    }
+
+
+    private async void CancelConfirm_Delete()
+    {
+        delete_dialog?.Close();
+
+        if (SelectedItem != null)
+        {
+            var res = await _stockApi.DeleteStock(SelectedItem.Id.ToString());
+            if (res)
+            {
+                
+                 var parameters = new DialogParameters();
+                     parameters.Add("ContentText", "Stock removed Successfully.");
+                     parameters.Add("ButtonText", "Ok");
+                     parameters.Add("Color", Color.Success);
+
+                 var options = new DialogOptions() { CloseButton = false, MaxWidth = MaxWidth.ExtraLarge };
+
+                 DialogService.Show<DialogTemplate>("Result", parameters, options);
+
+                 
+                Stocks = await _stockApi.GetAllStocks();
+                StateHasChanged();
+            }
+        }
+    }
+
+
+    private string SelectedRowClassFunc(Stock element, int rowNumber)
+    {
+
+        if (selectedRowNumber == rowNumber)
+        {
+            selectedRowNumber = -1;
+            return string.Empty;
+        }
+        else if (mudTable.SelectedItem != null && mudTable.SelectedItem.Id == element.Id)
+        {
+            selectedRowNumber = rowNumber;
+
+            return "selected";
+        }
+        else
+        {
+            return string.Empty;
+        }
+    }
+
+    private void CloseDeleteDialog()
+    {
+        //DeleteStatusDialog = false;
+        delete_dialog?.Close();
+        StateHasChanged();
+    }
+    private void Close2()
+    {
+        delete_dialog1?.Close();
+        StateHasChanged();
+        
+    }
+}

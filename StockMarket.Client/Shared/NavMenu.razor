@@ -1,0 +1,111 @@
+﻿@inject IdentityAuthenticationStateProvider authStateProvider
+
+<div class="top-row pl-4 navbar navbar-dark">
+    <a class="navbar-brand" href="">StockMarket</a>
+    <button class="navbar-toggler" @onclick="@ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="@ToggleNavMenu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span> Home
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="market">
+                <span class="oi oi-plus" aria-hidden="true"></span> Market
+            </NavLink>
+        </li>
+
+        @{
+            if (state != null)
+                if (state.User.IsInRole("user"))
+                {
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="buystocks">
+                            <span class="oi oi-plus" aria-hidden="true"></span> Buy Stocks
+                        </NavLink>
+
+                    </li>
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="sellstocks">
+                            <span class="oi oi-plus" aria-hidden="true"></span> Sell Stocks
+                        </NavLink>
+
+                    </li>
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="adddeposit">
+                            <span class="oi oi-plus" aria-hidden="true"></span> Add deposit
+                        </NavLink>
+
+                    </li>
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="orderhistory">
+                            <span class="oi oi-plus" aria-hidden="true"></span> Orders
+                        </NavLink>
+
+
+                    </li>
+
+
+                    //<li class="nav-item px-3">
+                    //    <NavLink class="nav-link" href="orderhistory">
+                    //        <span class="oi oi-plus" aria-hidden="true"></span> Order History
+                    //    </NavLink>
+
+                    //</li>
+                }
+        }
+        @{
+            if (state != null)
+                if (state.User.IsInRole("admin"))
+                {
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="addstock">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> Add Stock
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="markethours">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> Market Hours
+                        </NavLink>
+                    </li>
+                    
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="deletestock">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> Delete Stocks
+                        </NavLink>
+                    </li>
+
+
+                }
+        }
+
+
+    </ul>
+</div>
+@code {
+    AuthenticationState? state;
+    protected override async Task OnInitializedAsync()
+    {
+        state = await authStateProvider.GetAuthenticationStateAsync();
+        await base.OnInitializedAsync();
+        return;// Task.CompletedTask;
+    }
+
+
+}
+@functions {
+
+    bool collapseNavMenu = true;
+
+    string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

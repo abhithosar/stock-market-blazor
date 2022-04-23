@@ -1,0 +1,89 @@
+﻿@using StockMarket.Shared.Data.Models
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject StockApi _stockApi
+
+@inject NavigationManager NavigationManager
+
+<MudDataGrid MultiSelection="true" Items="@Stocks" Sortable="true" Filterable="true" QuickFilter="@_quickFilter"
+             SelectedItem="SelectedStock">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Available Stocks</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <Columns>
+        <Column T="Stock" Field="TickerName" Title="Stock Ticker" Sortable="true" Filterable="true" />
+        <Column T="Stock" Field="CompanyName" Title="Company Name" />
+        <Column T="Stock" Field="CurrentPrice" Title="Current Price" SortBy="@_sortBy" />
+        <Column T="Stock" Field="RemainingStockVolume" Title="Stock Volume" />
+        <Column T="Stock" Field="CreatedOn" Title="Date Created" />
+
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="Stock" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+
+    private Stock? SelectedStock;
+    private bool _sortNameByLength;
+    
+    private HubConnection? hubConnection;
+    private List<Stock>? Stocks;
+    private string? _searchString;
+
+    protected async override Task OnInitializedAsync()
+    {
+
+        Stocks = await _stockApi.GetAllStocks();
+         hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/markethub"))
+            .Build();
+
+        hubConnection.On<StockMarket.Shared.Data.Models.RunningDayStockLedger>("StockPriceUpdate", (ledger) =>
+        {
+
+            var stockToUpdate = Stocks.FirstOrDefault(x => x.Id == ledger.StockId);
+            if (stockToUpdate != null)
+            {
+                stockToUpdate.CurrentPrice = ledger.CurrentPrice;
+                
+            }
+            
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+        await base.OnInitializedAsync();
+        return;
+    }
+
+    private Func<Stock, object> _sortBy => x =>
+      {
+          if (_sortNameByLength)
+              return x.TickerName.Length;
+          else
+              return x.TickerName;
+      };
+
+
+    private Func<Stock?, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.TickerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (x.CompanyName.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if ($"{x.CurrentPrice} {x.CurrentPrice} {x.Id}".Contains(_searchString))
+            return true;
+
+        return false;
+    };
+}

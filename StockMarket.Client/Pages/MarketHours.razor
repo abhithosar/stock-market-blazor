@@ -1,0 +1,87 @@
+﻿@page "/markethours"
+@using StockMarket.Shared.Data.Context
+@using StockMarket.Shared.Data.Models
+
+@inject MarketHourApi marketHourApi
+
+<h3>MarketHours</h3>
+
+<div class="container-fluid">
+
+    @if (MarketHoursList == null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else
+    {
+        <EditForm Model="this">
+            <div class="row">
+                <div class="col-3">
+                    Day of week
+                </div>
+                <div class="col-3">
+                    Opening Hours
+                </div>
+                <div class="col-3">
+                    Closing Hours
+                </div>
+                <div class="col-3">
+                    Is market day
+                </div>
+            </div>
+
+            @foreach (var hours in MarketHoursList)
+            {
+                <div class="row">
+                    <div class="col-3">
+                        <InputText class="form-control" @bind-Value="hours.DayOfWeek" />
+                    </div>
+                    <div class="col-3">
+                        <MudTimePicker IconSize="Size.Small" height="100" PickerVariant="PickerVariant.Dialog"
+                               AutoClose="true" Label="24 hours" Editable="true" AmPm="false" @bind-Time="hours.OpeningHours" />
+                    </div>
+                    <div class="col-3">
+                        <MudTimePicker Label="24 hours" PickerVariant="PickerVariant.Dialog" Editable="true"  AmPm="false" @bind-Time="hours.ClosingHours" />
+                    </div>
+                    <div class="col-3">
+                        @* <InputCheckbox class="form-control" @bind-Value="hours.IsMarketDayBool" />*@
+                        <MudCheckBox @bind-Checked="@hours.IsMarketDayBool"></MudCheckBox>
+                    </div>
+                </div>
+
+            }
+            <MudButton ButtonType="ButtonType.Button" Variant="Variant.Filled" Color="Color.Primary" OnClick="@Save"> Save </MudButton>
+           
+        </EditForm>
+    }
+</div>
+
+@code {
+    private List<MarketHour>? MarketHoursList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetMarketHours();
+        return;
+    }
+
+    private async Task GetMarketHours()
+    {
+        MarketHoursList = await marketHourApi.GetAllMarketHours();
+        StateHasChanged();
+
+    }
+
+    private async Task Save()
+    {
+        if (MarketHoursList == null)
+        {
+            return;
+        }
+        var res = await marketHourApi.UpdateMarketHours(MarketHoursList);
+        if (res)
+            MarketHoursList = await marketHourApi.GetAllMarketHours();
+        StateHasChanged();
+        return;
+    }
+}

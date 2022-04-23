@@ -1,0 +1,111 @@
+﻿@page "/adddeposit"
+@using StockMarket.Shared.Data.Context
+<h6>Add/Remove Money</h6>
+<p></p>
+@inject MoneyApi moneyApi
+<MudItem xs="12" sm="6" md="4">
+    <MudTextField Label="Add/Withdraw Money" Placeholder="Enter deposit/withdraw amount" Variant="Variant.Outlined" @bind-Value="AmountToAddWithdraw"></MudTextField>
+</MudItem>
+
+<MudItem xs="12" sm="6" md="4">
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Money"
+               Size="Size.Medium"
+               Color="Color.Success" Class="px-10 m-1"
+               OnClick="@AddDepositConfirm">Deposit</MudButton>
+
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Money"
+               Size="Size.Medium"
+               Color="Color.Warning" Class="px-10 m-1"
+               OnClick="@WithdrawDepositConfirm">Withdraw</MudButton>
+</MudItem>
+
+<MudPaper Class="m-md-5"></MudPaper>
+<h6>Available Amount: @AvailableAmount</h6>
+<MudPaper Class="m-md-5"></MudPaper>
+<h6>Transactions</h6>
+<MudTable Items="@CashLedgerHistorys" T="CashLedgerHistory" Hover="@hover">
+    <HeaderContent>
+        <MudTh>Transaction Type</MudTh>
+        <MudTh>Stock Amount</MudTh>
+        <MudTh>Transaction date</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Stock">@context.TransactionType</MudTd>
+        <MudTd DataLabel="Stock Amount">@context.Amount</MudTd>
+        <MudTd DataLabel="Portfolio Value">@context.TransactionDate</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[]{50, 100}" />
+    </PagerContent>
+</MudTable>
+
+<MudDialog @bind-IsVisible="DepositDialogVisible" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Done" Class="mr-3" /> Order Status
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+
+        @{
+            if (!DepositError)
+            {
+                <p>Operation successfull!</p>
+            }
+            else
+            {
+                <p>Operation unsuccessfull, please try again.</p>
+            }
+        }
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseStatusDialog" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private DialogOptions dialogOptions = new() { FullWidth = true };
+    private decimal AmountToAddWithdraw;
+    private bool DepositDialogVisible;
+    private bool DepositError;
+    private bool hover = true;
+    private decimal AvailableAmount;
+
+    private List<CashLedgerHistory>? CashLedgerHistorys;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateData();
+        await base.OnInitializedAsync();
+        return;
+    }
+    private async Task UpdateData()
+    {
+        CashLedgerHistorys = await moneyApi.GetTransactions();
+        AvailableAmount = await moneyApi.GetAvailableMoney();
+    }
+
+    private async void AddDepositConfirm()
+    {
+        DepositError = !await moneyApi.AddMoney(new StockMarket.Shared.Data.Models.AddMoney() { AmountToAdd = AmountToAddWithdraw });
+
+        if (!DepositError)
+            await UpdateData();
+
+        StateHasChanged();
+
+    }
+    private async void WithdrawDepositConfirm()
+    {
+        DepositError = !await moneyApi.RemoveMoney(new StockMarket.Shared.Data.Models.AddMoney() { AmountToAdd = AmountToAddWithdraw });
+        if (!DepositError)
+            await UpdateData();
+        StateHasChanged();
+    }
+
+    private void CloseStatusDialog()
+    {
+        DepositDialogVisible = false;
+    }
+}

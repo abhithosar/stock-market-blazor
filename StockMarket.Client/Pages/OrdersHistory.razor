@@ -1,0 +1,79 @@
+﻿@page "/orderhistory"
+@using StockMarket.Shared.Data.Context
+
+
+@inject OrdersApi ordersApi
+
+
+<h6>Pending Orders:</h6>
+<p></p>
+<MudTable Items="@PendingOrders" T="Order" Hover="@hover">
+    <HeaderContent>
+        <MudTh>Id</MudTh>
+        <MudTh>Stock Ticker</MudTh>
+        <MudTh>Stock Price</MudTh>
+        <MudTh>Stock Volume</MudTh>
+        <MudTh>Order Type</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Stock">@context.Id</MudTd>
+        <MudTd DataLabel="Stock Ticker">@context.StockTicker</MudTd>
+        <MudTd DataLabel="Ordered Price">@context.OrderedPrice</MudTd>
+        <MudTd DataLabel="Volume">@context.Volume</MudTd>
+        <MudTd DataLabel="Order Type">@context.OrderType</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[]{50, 100}" />
+    </PagerContent>
+</MudTable>
+
+<MudPaper Class="m-md-5"></MudPaper>
+
+<h6>Order History:</h6>
+<p></p>
+<MudTable Items="@OrderHistories" T="OrderHistory" Hover="@hover">
+    <HeaderContent>
+        <MudTh>Id</MudTh>
+        <MudTh>Stock Ticker</MudTh>
+        <MudTh>Executed Price</MudTh>
+        <MudTh>Stock Volume</MudTh>
+        <MudTh>Order Type</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Stock">@context.Id</MudTd>
+        <MudTd DataLabel="Stock Ticker">@context.StockTicker</MudTd>
+        <MudTd DataLabel="Ordered Price">@context.ExecutedPrice</MudTd>
+        <MudTd DataLabel="Volume">@context.Volume</MudTd>
+        <MudTd DataLabel="Order Type">@context.OrderType</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[]{50, 100}" />
+    </PagerContent>
+</MudTable>
+
+
+
+@code {
+    private bool hover;
+
+    private List<Order> PendingOrders;
+    private List<OrderHistory> OrderHistories;
+
+    protected async override Task OnInitializedAsync()
+    {
+        PendingOrders = await ordersApi.GetListOfOrders();
+        OrderHistories = await ordersApi.GetAllArchivedOrders();
+
+        if(PendingOrders != null && PendingOrders.Any()){
+            PendingOrders = PendingOrders.OrderByDescending(x => x.UpdatedOn).ToList();
+
+        }
+        if(OrderHistories != null && OrderHistories.Any()){
+            OrderHistories = OrderHistories.OrderByDescending(x => x.UpdatedOn).ToList();
+
+        }
+
+        await base.OnInitializedAsync();
+        return; 
+    }
+}

@@ -1,0 +1,146 @@
+﻿@page "/market"
+@using Microsoft.AspNetCore.SignalR.Client
+@using StockMarket.Shared.Data.Models
+
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+
+@inject StockApi _stockApi
+
+<PageTitle>Market</PageTitle>
+
+
+<MudDataGrid MultiSelection="true" Items="@Stocks"   Sortable="true" Filterable="true" QuickFilter="@_quickFilter"
+             SelectedItem="SelectedStock">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Available Stocks</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <Columns>
+        <Column T="RunningDayStockLedger" Field="StockTicker" Title="Stock Ticker" Sortable="true" Filterable="true" />
+        <Column T="RunningDayStockLedger" Field="CompanyName" Title="Company Name" />
+        <Column T="RunningDayStockLedger" Field="CurrentPrice" Title="Current Price" SortBy="@_sortBy" />
+        <Column T="RunningDayStockLedger" Field="DayLowPrice" Title="Day low price" />
+        <Column T="RunningDayStockLedger" Field="DayHighPrice" Title="Day high price" />
+        <Column T="RunningDayStockLedger" Field="DayVolume" Title="Day Volume" />
+        <Column T="RunningDayStockLedger" Field="MarketCapitallization" Title="Market Cap." />
+        
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="RunningDayStockLedger" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    [Parameter]
+    public bool IsAdminCall{ get; set; }
+    private HubConnection? hubConnection;
+    private List<string> messages = new List<string>();
+    private string? userInput;
+    private string? messageInput;
+    private List<RunningDayStockLedger>? Stocks;
+    private RunningDayStockLedger? SelectedStock;
+
+    private string? _searchString;
+    private bool _sortNameByLength;
+    string[] headings = { "Stock Ticker", "Company Name", "Current Price", "Day Low Price", "Day High Price", "Day Volume" };
+    private Func<RunningDayStockLedger, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.StockTicker.Length;
+        else
+            return x.StockTicker;
+    };
+
+
+    private Func<RunningDayStockLedger?, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.StockTicker.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (x.CompanyName.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if ($"{x.CurrentPrice} {x.DayVolume} {x.StockId}".Contains(_searchString))
+            return true;
+
+        return false;
+    };
+
+    void StartedEditingItem()
+    {
+        //_events.Insert(0, $"Event = StartedEditingItem, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+    }
+
+    
+    protected override async Task OnInitializedAsync()
+    {
+
+
+        Stocks = await _stockApi.GetAllRunningDayLedger();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/markethub"))
+            .Build();
+
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodedMsg = $"{user}: {message}";
+            messages.Add(encodedMsg);
+            StateHasChanged();
+        });
+
+        hubConnection.On<bool>("MarketStatusUpdated", async (status) =>
+        {
+            //Stocks = await _stockApi.GetAllRunningDayLedger();
+            StateHasChanged();
+        });
+         
+        hubConnection.On<StockMarket.Shared.Data.Models.RunningDayStockLedger>("StockPriceUpdate", (ledger) =>
+        {
+            
+            if(!Stocks.Any(x => x.StockTicker == ledger.StockTicker)){
+                Stocks.Add(ledger);
+            }
+
+            var stockToUpdate = Stocks.FirstOrDefault(x => x.StockId == ledger.StockId);
+            if (stockToUpdate != null)
+            {
+                stockToUpdate.CurrentPrice = ledger.CurrentPrice;
+                stockToUpdate.DayHighPrice = ledger.DayHighPrice;
+                stockToUpdate.DayLowPrice = ledger.DayLowPrice;
+                stockToUpdate.DayVolume = ledger.DayVolume;
+            }
+            
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+
+
+    private async Task Send()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("SendMessage", userInput, messageInput);
+        }
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
